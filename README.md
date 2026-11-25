@@ -7,7 +7,7 @@ Doplněk (addon) ve formátu Stremio addon protocol. Nabízí:
 - **AniList: Sleduji, V plánu, Dokončeno, Pozastaveno, Zahozeno**, tedy seznamy
   zvoleného uživatele AniListu (jen čtení, bez přihlášení), seřazené podle poslední změny.
 
-Běží zdarma na Cloudflare Workers, data bere z veřejného AniList GraphQL API.
+Běží zdarma na Vercelu (Hobby), data bere z veřejného AniList GraphQL API.
 Detail titulu s epizodami dodá **AIOMetadata**, streamy dodá **Torrentio**.
 
 ## Jak to funguje
@@ -19,13 +19,15 @@ Detail titulu s epizodami dodá **AIOMetadata**, streamy dodá **Torrentio**.
 | Detail a epizody | náš addon meta neposkytuje, Nuvio se proto zeptá AIOMetadata (podporuje `kitsu:`, `tt`, `anilist:`) |
 | Streamy | AIOMetadata vytvoří ID epizod `kitsu:<id>:<epizoda>` (nebo `tt…:S:E`) a Torrentio je umí |
 | Typ | katalog `anime`; položky `movie` (MOVIE, SPECIAL) nebo `series` (ostatní), stejně jako u AIOMetadata |
-| Cache | Cloudflare Cache API: sezónní katalogy 6 h, seznamy 15 min, mapování 24 h (plus v paměti) |
+| Cache | Vercel CDN podle hlavičky `CDN-Cache-Control` (sezónní katalogy 6 h, seznamy 15 min, manifest 1 h) a navíc v paměti funkce (stránky z AniListu, mapování 24 h) |
 | Rate limit | AniList teď povoluje 30 požadavků za minutu (hlavička `X-RateLimit-Limit`). Při 429 addon počká podle `Retry-After` (max. 15 s) a zkusí to až 2× znovu |
 
-**Proč kompaktní mapování:** plný Fribb soubor má 7,5 MB a jeho parsování trvá asi 30 ms CPU.
-Free plán Workers dovoluje 10 ms CPU na požadavek. Kompaktní soubor se parsuje asi za 2 ms.
-Když kompaktní soubor chybí (třeba před prvním během Action), addon použije plný Fribb jako
-nouzovou zálohu a výsledek si uloží do cache. Na free plánu tahle záloha může selhat.
+**Proč ne Cloudflare Workers:** AniList blokuje všechny požadavky z Cloudflare Workers
+(HTTP 403 „You have been manually blocked“, ověřeno 25. 11. 2026 z více lokalit, i s hlavičkou User-Agent).
+Proto addon běží jako Node funkce na Vercelu.
+
+**Proč kompaktní mapování:** plný Fribb soubor má 7,5 MB, kompaktní asi 350 kB, takže se rychleji stáhne
+i zpracuje. Když kompaktní soubor chybí (třeba před prvním během Action), addon nouzově použije plný Fribb.
 
 **Tituly bez mapování** (hlavně úplně nové) se nevynechávají. Dostanou ID `anilist:<id>`
 a AIOMetadata je zkusí přeložit vlastním mapováním. Když to nezvládne, detail se neotevře.
@@ -59,35 +61,40 @@ npm test
 npm run dev
 ```
 
-Addon poběží na `http://127.0.0.1:8787`:
+`npm run dev` sestaví balíček a spustí lokální Node server na `http://127.0.0.1:8787` (port změníš proměnnou `PORT`):
 
 - `http://127.0.0.1:8787/manifest.json`
 - `http://127.0.0.1:8787/catalog/anime/al_popular/genre=Podzim%202026.json`
 - `http://127.0.0.1:8787/catalog/anime/al_list_current.json`
 - `http://127.0.0.1:8787/configure`: stránka, kde zadáš jméno a dostaneš manifest URL
 
-Když lokálně ještě neexistuje větev `data`, použije se nouzově plný Fribb (lokálně limit CPU neplatí).
+Když ještě neexistuje větev `data` (nebo je repo soukromé), použije se nouzově plný Fribb.
 
-## Nasazení na Cloudflare Workers přes GitHub
+## Nasazení na Vercel
 
-1. **Repozitář na GitHubu:** vytvoř `Adamej05/anilist-nuvio-addon` a pushni do něj tuhle složku (větev `main`).
-   Pokud repo pojmenuješ jinak, uprav `MAPPING_URL` ve `wrangler.toml`.
-   Repo musí být **veřejné**: Worker si mapování stahuje z `raw.githubusercontent.com`, a to u soukromého repa vrátí 404.
+1. **Repozitář na GitHubu:** `Adamej05/anilist-nuvio-addon`, větev `main`.
+   Repo musí být **veřejné**: addon si mapování stahuje z `raw.githubusercontent.com`, a to u soukromého repa vrátí 404.
+   Pokud repo pojmenuješ jinak, uprav `DEFAULT_MAPPING_URL` v `src/config.ts` (nebo proměnnou `MAPPING_URL`).
 2. **Mapování:** Action *Build ID mapping* se spustí sama při pushi, který změní mapovací skript nebo workflow.
    Kdykoli jindy ji spustíš ručně přes *Actions → Build ID mapping → Run workflow*.
    Vznikne větev `data` se souborem `mapping.json`. Dál se obnovuje sama každý den ve 4:23 UTC.
-3. **Cloudflare:** *Workers & Pages → Create → Import a repository*, vyber `Adamej05/anilist-nuvio-addon`.
-   - Production branch: `main`
-   - Build command: nech prázdné. Deploy command: `npx wrangler deploy` (výchozí).
-   - V *Settings → Build → Branch control* **vypni „Builds for non-production branches“**, jinak
-     Cloudflare zkouší sestavit i denní push do větve `data` (ten build selže, nic se nerozbije, jen to dělá šum).
-4. Každý push do `main` pak nasadí novou verzi automaticky.
+3. **Vercel:** na [vercel.com](https://vercel.com) se přihlas přes GitHub, *Add New → Project* a importuj
+   `Adamej05/anilist-nuvio-addon`. Nastavení se načte z `vercel.json` (Framework: Other,
+   build `npm run build`, region `fra1`), nic dalšího se vyplňovat nemusí.
+   Případně z příkazové řádky: `npx vercel login`, `npx vercel link`, `npx vercel deploy --prod`
+   a napojení na GitHub `npx vercel git connect`.
+4. Každý push do `main` pak nasadí novou verzi automaticky. Push do větve `data` vytvoří jen
+   preview build, který nic nerozbije. Vypnout ho můžeš v *Settings → Git → Ignored Build Step*.
 
-Nastavení se mění ve `wrangler.toml` v sekci `[vars]`. Proměnné z dashboardu by další deploy z Gitu přepsal.
+Build (`scripts/build.mjs`) zabalí addon pomocí esbuild do jedné Node funkce podle
+[Build Output API](https://vercel.com/docs/build-output-api) (`.vercel/output`).
+
+Výchozí hodnoty jsou v `src/config.ts`. Přepsat je můžeš proměnnými prostředí ve Vercelu
+(*Project → Settings → Environment Variables*, pak redeploy):
 
 | Proměnná | Výchozí | Význam |
 |---|---|---|
-| `ANILIST_USER` | `Achnatos` | uživatel pro seznamy; prázdné = bez seznamů |
+| `ANILIST_USER` | `Achnatos` | uživatel pro seznamy; `-` = bez seznamů |
 | `ENABLE_SPLIT_FILTERS` | `false` | `true` přidá testovací katalog se dvěma filtry |
 | `MAPPING_URL` | raw URL větve `data` | kompaktní mapování |
 
@@ -96,10 +103,10 @@ nejstarší rok (`MIN_YEAR = 1960`), formáty (`FORMATS`), doby cache, jazyk ná
 
 ## Manifest URL a přidání do Nuvia
 
-Po nasazení Cloudflare ukáže adresu ve tvaru `https://anilist-nuvio-addon.<tvuj-subdomain>.workers.dev`.
+Po nasazení Vercel ukáže adresu ve tvaru `https://anilist-nuvio-addon.vercel.app` (nebo podobnou, podle volného názvu).
 
-- Výchozí uživatel z `ANILIST_USER`: `https://anilist-nuvio-addon.<subdomain>.workers.dev/manifest.json`
-- Jiný účet: `https://anilist-nuvio-addon.<subdomain>.workers.dev/u/<JmenoNaAniListu>/manifest.json`
+- Výchozí uživatel: `https://<adresa>/manifest.json`
+- Jiný účet: `https://<adresa>/u/<JmenoNaAniListu>/manifest.json`
 - Nebo otevři `…/configure`, napiš jméno a zkopíruj URL.
 
 V Nuviu: **Nastavení → Doplňky (Addons) → Přidat doplněk**, vlož manifest URL a potvrď.
@@ -122,16 +129,19 @@ ID katalogů: `al_popular`, `al_top`, `al_list_current`, `al_list_planning`, `al
 ## Struktura
 
 ```
-src/index.ts          router, CORS
+src/app.ts            router, CORS, hlavičky cache (Web Request → Response)
+src/node.ts           Node adaptér (Vercel funkce i lokální server)
+src/entry/            vstupní body: vercel.ts, dev-server.ts
 src/manifest.ts       manifest a definice katalogů
 src/filters.ts        volby filtru, převod na AniList proměnné, skip → stránka
 src/anilist.ts        GraphQL dotazy, retry při 429
 src/catalog.ts        obsluha katalogů
 src/meta.ts           převod AniList média na Stremio položku
-src/mapping.ts        načtení mapování (paměť → Cache API → GitHub → záloha Fribb)
+src/mapping.ts        načtení mapování (paměť → GitHub → záloha Fribb)
 src/mappingFormat.ts  formát mapování (sdílí ho i build skript)
-src/cache.ts          pomocník pro Cache API
+src/cache.ts          cache v paměti (LRU s expirací)
 src/configure.ts      konfigurační stránka
+scripts/build.mjs     balíček pro Vercel a lokální server
 scripts/build-mapping.ts
 .github/workflows/    denní mapování, testy
 test/                 testy (vitest)

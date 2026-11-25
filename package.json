@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "description": "Stremio/Nuvio addon: AniList anime by year and season, plus AniList user lists",
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/build.mjs && node out/dev-server.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "build:mapping": "node scripts/build-mapping.ts out/mapping.json"
@@ -12,15 +12,16 @@
   "license": "MIT",
   "type": "module",
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20261125.1",
     "@types/node": "^26.6.10",
+    "esbuild": "^0.28.2",
     "typescript": "^7.0.2",
-    "vitest": "^5.1.1",
-    "wrangler": "^4.168.0"
+    "vitest": "^5.1.1"
   },
   "allowScripts": {
-    "workerd@1.20261123.1": true,
     "esbuild@0.28.2": true
   },
-  "private": true
+  "private": true,
+  "engines": {
+    "node": ">=22.18"
+  }
 }

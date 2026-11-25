@@ -1,4 +1,4 @@
-import { ANILIST_URL, RETRY } from "./config";
+import { ANILIST_URL, RETRY, USER_AGENT } from "./config";
 
 export interface AniListMedia {
   id: number;
@@ -103,7 +103,11 @@ export async function anilistRequest<T>(
   for (let attempt = 0; ; attempt++) {
     const res = await doFetch(ANILIST_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "User-Agent": USER_AGENT,
+      },
       body: JSON.stringify({ query, variables }),
     });
 
@@ -118,7 +122,7 @@ export async function anilistRequest<T>(
 
     let body: { data?: T; errors?: Array<{ message: string; status?: number }> };
     try {
-      body = await res.json();
+      body = (await res.json()) as typeof body;
     } catch {
       throw new AniListError(`AniList HTTP ${res.status} with invalid JSON`, res.status);
     }

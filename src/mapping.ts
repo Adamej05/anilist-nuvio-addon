@@ -2,23 +2,20 @@ import { FRIBB_URL, TTL } from "./config";
 import { convertFribb, isCompactMapping, type CompactMapping, type FribbEntry } from "./mappingFormat";
 
 /**
- * Loads the compact mapping (about 350 kB, about 2 ms to parse):
- * 1. from memory of this isolate,
- * 2. from the Cache API (24 h),
- * 3. from MAPPING_URL (the "data" branch built by the GitHub Action),
- * 4. as a fallback from the full Fribb dataset, converted here. That parse costs
- *    about 30 ms CPU, above the free plan's 10 ms, so it is only a last resort;
- *    the converted result is cached, so it happens at most once a day.
+ * Loads the compact mapping (about 350 kB):
+ * 1. from memory of this function instance (24 h),
+ * 2. from MAPPING_URL (the "data" branch built by the GitHub Action),
+ * 3. as a fallback from the full Fribb dataset (7.5 MB), converted here.
  * If everything fails, an empty mapping is used and items get anilist:ID.
  */
 
 let memory: { data: CompactMapping; expiresAt: number } | null = null;
 let inFlight: Promise<CompactMapping> | null = null;
 
-export async function getMapping(mappingUrl: string, ctx: ExecutionContext): Promise<CompactMapping> {
+export async function getMapping(mappingUrl: string, fetchImpl: typeof fetch = fetch): Promise<CompactMapping> {
   if (memory && memory.expiresAt > Date.now()) return memory.data;
   if (!inFlight) {
-    inFlight = loadMapping(mappingUrl, ctx)
+    inFlight = loadMapping(mappingUrl, fetchImpl)
       .then((data) => {
         memory = { data, expiresAt: Date.now() + TTL.mapping * 1000 };
         return data;
@@ -37,35 +34,27 @@ export async function getMapping(mappingUrl: string, ctx: ExecutionContext): Pro
   return inFlight;
 }
 
-async function loadMapping(mappingUrl: string, ctx: ExecutionContext): Promise<CompactMapping> {
-  const cache = caches.default;
-  const key = new Request(mappingUrl);
-  const hit = await cache.match(key).catch(() => undefined);
-  if (hit) {
-    const data = await hit.json().catch(() => null);
-    if (isCompactMapping(data)) return data;
-  }
+/** For tests. */
+export function resetMappingCache(): void {
+  memory = null;
+  inFlight = null;
+}
 
-  let data: CompactMapping | null = null;
+async function loadMapping(mappingUrl: string, fetchImpl: typeof fetch): Promise<CompactMapping> {
   try {
-    const res = await fetch(mappingUrl);
+    const res = await fetchImpl(mappingUrl);
     if (res.ok) {
       const json: unknown = await res.json();
-      data = Array.isArray(json) ? convertFribb(json as FribbEntry[]) : isCompactMapping(json) ? json : null;
+      if (Array.isArray(json)) return convertFribb(json as FribbEntry[]);
+      if (isCompactMapping(json)) return json;
+    } else {
+      console.warn(`compact mapping HTTP ${res.status}`);
     }
   } catch (err) {
     console.warn("compact mapping unavailable", err);
   }
-  if (!data) {
-    console.warn("falling back to full Fribb dataset");
-    const res = await fetch(FRIBB_URL);
-    if (!res.ok) throw new Error(`Fribb HTTP ${res.status}`);
-    data = convertFribb((await res.json()) as FribbEntry[]);
-  }
-
-  const response = new Response(JSON.stringify(data), {
-    headers: { "Content-Type": "application/json", "Cache-Control": `public, max-age=${TTL.mapping}` },
-  });
-  ctx.waitUntil(cache.put(key, response).catch(() => undefined));
-  return data;
+  console.warn("falling back to full Fribb dataset");
+  const res = await fetchImpl(FRIBB_URL);
+  if (!res.ok) throw new Error(`Fribb HTTP ${res.status}`);
+  return convertFribb((await res.json()) as FribbEntry[]);
 }

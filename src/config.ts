@@ -1,8 +1,19 @@
 /**
  * Central settings. Everything you might want to tweak lives here.
- * Values that differ per deployment (user name, feature flag, mapping URL)
- * come from environment variables, see wrangler.toml.
+ * The defaults below can be overridden per deployment with environment
+ * variables (Vercel: Project -> Settings -> Environment Variables):
+ *   ANILIST_USER, ENABLE_SPLIT_FILTERS, MAPPING_URL.
  */
+
+/** AniList user for the list catalogs. "-" in ANILIST_USER turns the lists off. */
+export const DEFAULT_ANILIST_USER = "Achnatos";
+
+/** Test catalog with two separate filters (rok + sezona). */
+export const DEFAULT_ENABLE_SPLIT_FILTERS = false;
+
+/** Compact mapping published by .github/workflows/mapping.yml to the "data" branch. */
+export const DEFAULT_MAPPING_URL =
+  "https://raw.githubusercontent.com/Adamej05/anilist-nuvio-addon/data/mapping.json";
 
 /** AniList media formats included in the season catalogs. */
 export const FORMATS = ["TV", "TV_SHORT", "MOVIE", "ONA", "OVA", "SPECIAL"] as const;
@@ -38,6 +49,9 @@ export const RETRY = {
 } as const;
 
 export const ANILIST_URL = "https://graphql.anilist.co";
+
+/** Workers send no User-Agent by default; AniList asks API clients to identify themselves. */
+export const USER_AGENT = "anilist-nuvio-addon/1.0 (+https://github.com/Adamej05/anilist-nuvio-addon)";
 
 /** Full Fribb dataset, used only as a fallback when the compact mapping is unavailable. */
 export const FRIBB_URL = "https://raw.githubusercontent.com/Fribb/anime-lists/master/anime-list-full.json";

@@ -1,5 +1,5 @@
 import { fetchBrowsePage, fetchUserListPage, type AniListMedia, type MediaPage, type RequestDeps } from "./anilist";
-import { cachedJson, sha256Hex } from "./cache";
+import { cachedJson, sha256Hex, type JsonCache } from "./cache";
 import { PAGE_SIZE, TTL } from "./config";
 import { catalogVariables, parseGenreOption, parseSplitFilter, skipToPages, SPLIT_EXTRA_SEASON, SPLIT_EXTRA_YEAR, type Filter, type SortKind } from "./filters";
 import { CATALOG_TYPE, LIST_CATALOGS, SEASON_CATALOGS, SPLIT_CATALOG } from "./manifest";
@@ -7,8 +7,7 @@ import type { CompactMapping } from "./mappingFormat";
 import { toMetaPreview, type MetaPreview } from "./meta";
 
 export interface CatalogContext {
-  origin: string;
-  exec: ExecutionContext;
+  cache: JsonCache;
   username?: string;
   splitEnabled: boolean;
   getMapping: () => Promise<CompactMapping>;
@@ -78,7 +77,7 @@ export async function handleCatalog(
     ttl = TTL.seasonal;
     loader = async (page) => {
       const key = await sha256Hex(JSON.stringify(["browse", variables, page, PAGE_SIZE]));
-      return cachedJson(`${ctx.origin}/__cache/anilist/${key}`, ttl, ctx.exec, () =>
+      return cachedJson(ctx.cache, `anilist:${key}`, ttl, () =>
         fetchBrowsePage({ ...variables }, page, PAGE_SIZE, ctx.deps),
       );
     };
@@ -87,7 +86,7 @@ export async function handleCatalog(
     ttl = TTL.userList;
     loader = async (page) => {
       const key = await sha256Hex(JSON.stringify(["list", user.toLowerCase(), resolved.statuses, page, PAGE_SIZE]));
-      return cachedJson(`${ctx.origin}/__cache/anilist/${key}`, ttl, ctx.exec, () =>
+      return cachedJson(ctx.cache, `anilist:${key}`, ttl, () =>
         fetchUserListPage(user, resolved.statuses, page, PAGE_SIZE, ctx.deps),
       );
     };
