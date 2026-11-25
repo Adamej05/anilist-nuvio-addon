@@ -142,7 +142,7 @@ Katalogy najdeš na Home a v Discover (typ „anime“). Filtr je rozbalovací s
 | `/manifest.json` | manifest, volby filtru se generují při každém požadavku (rok+1 až 1960) |
 | `/catalog/anime/{id}.json` | katalog bez filtru |
 | `/catalog/anime/{id}/genre=…&skip=….json` | katalog s filtrem a stránkováním |
-| `/meta/{series|movie}/{alsz:…|kitsu:…}.json` | detail s epizodami |
+| `/meta/{typ}/{id}.json` | detail s epizodami (typ `series` nebo `movie`, ID `alsz:…` nebo `kitsu:…`) |
 | `/poster/{kódy}/{cesta obálky}` | plakát s ikonkami |
 | `/u/{uživatel}/…` | totéž pro jiného uživatele AniListu |
 | `/configure` | konfigurační stránka |
