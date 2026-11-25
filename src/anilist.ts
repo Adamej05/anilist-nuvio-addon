@@ -72,8 +72,8 @@ query ($userName: String, $chunk: Int, $perChunk: Int) {
 }`;
 
 export const MEDIA_DETAIL_QUERY = `
-query ($id: Int) {
-  Media(id: $id, type: ANIME) {
+query ($id: Int, $idMal: Int) {
+  Media(id: $id, idMal: $idMal, type: ANIME) {
     ${MEDIA_FIELDS}
     endDate { year month day }
     nextAiringEpisode { episode airingAt }
@@ -249,9 +249,14 @@ export interface MediaDetail extends AniListMedia {
   studios: { nodes: Array<{ name: string } | null> | null } | null;
 }
 
-export async function fetchMediaDetail(id: number, deps?: RequestDeps): Promise<MediaDetail | null> {
+/** By AniList id, or by MAL id with { idMal }. */
+export async function fetchMediaDetail(
+  id: number | { idMal: number },
+  deps?: RequestDeps,
+): Promise<MediaDetail | null> {
+  const variables = typeof id === "number" ? { id } : { idMal: id.idMal };
   try {
-    const data = await anilistRequest<{ Media: MediaDetail | null }>(MEDIA_DETAIL_QUERY, { id }, deps);
+    const data = await anilistRequest<{ Media: MediaDetail | null }>(MEDIA_DETAIL_QUERY, variables, deps);
     return data.Media;
   } catch (e) {
     if (e instanceof AniListError && e.status === 404) return null;

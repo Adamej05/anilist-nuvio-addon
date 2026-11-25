@@ -123,6 +123,7 @@ export async function handleRequest(request: Request, env: AppEnv, deps: AppDeps
         username,
         getMapping: () => getMapping(mappingUrl, deps.fetchImpl),
         deps: deps.anilist,
+        fetchImpl: deps.fetchImpl,
       });
       // 404 lets Nuvio try the next metadata addon for ids we do not know.
       if (!result.meta) return json({ meta: null }, 600, 404);
@@ -147,6 +148,7 @@ export async function handleRequest(request: Request, env: AppEnv, deps: AppDeps
         splitEnabled,
         getMapping: () => getMapping(mappingUrl, deps.fetchImpl),
         deps: deps.anilist,
+        fetchImpl: deps.fetchImpl,
       });
       return json({ metas: result.metas }, result.cacheSeconds);
     }

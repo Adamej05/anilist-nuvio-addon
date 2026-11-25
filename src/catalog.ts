@@ -12,8 +12,9 @@ import { cachedJson, sha256Hex, type JsonCache } from "./cache";
 import { PAGE_SIZE, TTL } from "./config";
 import { catalogVariables, parseGenreOption, parseSplitFilter, skipToPages, SPLIT_EXTRA_SEASON, SPLIT_EXTRA_YEAR, type Filter, type SortKind } from "./filters";
 import { CATALOG_TYPE, customListFromCatalogId, LIST_CATALOGS, SEASON_CATALOGS, SPLIT_CATALOG } from "./manifest";
-import type { CompactMapping } from "./mappingFormat";
-import { toMetaPreview, type MetaPreview } from "./meta";
+import { kitsuIdForMedia } from "./kitsu";
+import { lookupIds, type CompactMapping } from "./mappingFormat";
+import { stremioType, toMetaPreview, type MetaPreview } from "./meta";
 
 export interface CatalogContext {
   cache: JsonCache;
@@ -23,6 +24,8 @@ export interface CatalogContext {
   splitEnabled: boolean;
   getMapping: () => Promise<CompactMapping>;
   deps?: RequestDeps;
+  /** For the Kitsu API fallback. */
+  fetchImpl?: typeof fetch;
 }
 
 /** Parses the Stremio extra path segment, e.g. "genre=L%C3%A9to%202027&skip=50". */
@@ -141,7 +144,24 @@ export async function handleCatalog(
 
   const mapping = await ctx.getMapping();
   const index = collection ? entryIndex(collection) : undefined;
-  const metas = media.map((m) => toMetaPreview(m, mapping, { origin: ctx.origin, entry: index?.get(m.id) }));
+  // Movies are streamed by their item id, so an unmapped movie needs its Kitsu id now
+  // (series get theirs in the detail page). Fribb leaves out adult titles entirely.
+  const kitsuIds = new Map<number, number>();
+  await Promise.all(
+    media
+      .filter((m) => stremioType(m.format) === "movie")
+      .filter((m) => {
+        const ids = lookupIds(mapping, m.id);
+        return !ids.kitsu && !ids.imdb;
+      })
+      .map(async (m) => {
+        const k = await kitsuIdForMedia(m.id, m.idMal, { cache: ctx.cache, fetchImpl: ctx.fetchImpl });
+        if (k) kitsuIds.set(m.id, k);
+      }),
+  );
+  const metas = media.map((m) =>
+    toMetaPreview(m, mapping, { origin: ctx.origin, entry: index?.get(m.id), kitsuId: kitsuIds.get(m.id) }),
+  );
   // With badges the response depends on the user's list, so it is cached like the list.
   const cacheSeconds = resolved.kind === "season" && !collection ? TTL.seasonal : TTL.userList;
   return { metas, cacheSeconds };

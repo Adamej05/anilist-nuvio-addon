@@ -30,18 +30,25 @@ export function stremioType(format: string | null): "movie" | "series" {
   return format === "MOVIE" || format === "SPECIAL" ? "movie" : "series";
 }
 
-export function itemId(m: Pick<AniListMedia, "id" | "format">, mapping: CompactMapping): string {
+/** kitsuOverride: a Kitsu id found outside the Fribb mapping (see kitsu.ts). */
+export function itemId(m: Pick<AniListMedia, "id" | "format">, mapping: CompactMapping, kitsuOverride?: number): string {
   if (stremioType(m.format) === "movie") {
     const ids = lookupIds(mapping, m.id);
-    if (ids.kitsu) return `kitsu:${ids.kitsu}`;
+    const kitsu = ids.kitsu ?? kitsuOverride;
+    if (kitsu) return `kitsu:${kitsu}`;
     if (ids.imdb) return ids.imdb;
   }
   return `${OWN_PREFIX}${m.id}`;
 }
 
 /** Video id of one episode: kitsu when mapped (Torrentio), otherwise our own. */
-export function episodeVideoId(anilistId: number, episode: number, mapping: CompactMapping): string {
-  const kitsu = lookupIds(mapping, anilistId).kitsu;
+export function episodeVideoId(
+  anilistId: number,
+  episode: number,
+  mapping: CompactMapping,
+  kitsuOverride?: number,
+): string {
+  const kitsu = lookupIds(mapping, anilistId).kitsu ?? kitsuOverride;
   return kitsu ? `kitsu:${kitsu}:${episode}` : `${OWN_PREFIX}${anilistId}:${episode}`;
 }
 
@@ -83,12 +90,14 @@ export interface PreviewOptions {
   origin?: string;
   /** The user's list entry for this anime, if any. */
   entry?: Pick<ListEntry, "status" | "customLists">;
+  /** Kitsu id found outside the Fribb mapping. */
+  kitsuId?: number;
 }
 
 export function toMetaPreview(m: AniListMedia, mapping: CompactMapping, opts: PreviewOptions = {}): MetaPreview {
   const year = m.seasonYear ?? m.startDate?.year ?? undefined;
   const meta: MetaPreview = {
-    id: itemId(m, mapping),
+    id: itemId(m, mapping, opts.kitsuId),
     type: stremioType(m.format),
     name: displayTitle(m),
     posterShape: "poster",
@@ -215,7 +224,13 @@ function releaseRange(m: MediaDetail): string | undefined {
 export function toMetaDetail(
   m: MediaDetail,
   mapping: CompactMapping,
-  opts: { id: string; type: "movie" | "series"; entry?: Pick<ListEntry, "status" | "customLists"> },
+  opts: {
+    id: string;
+    type: "movie" | "series";
+    entry?: Pick<ListEntry, "status" | "customLists">;
+    /** Kitsu id found outside the Fribb mapping. */
+    kitsuId?: number;
+  },
 ): MetaDetailResponse {
   const base = toMetaPreview(m, mapping, { entry: opts.entry });
   const studio = m.studios?.nodes?.find(Boolean)?.name;
@@ -246,7 +261,7 @@ export function toMetaDetail(
     const ep = i + 1;
     const extraInfo = info.get(ep);
     const video: MetaVideo = {
-      id: episodeVideoId(m.id, ep, mapping),
+      id: episodeVideoId(m.id, ep, mapping, opts.kitsuId),
       title: extraInfo?.title ? `${ep}. ${extraInfo.title}` : `Epizoda ${ep}`,
       season: 1,
       episode: ep,

@@ -73,6 +73,14 @@ function fakeFetch() {
       }
       return new Response(JSON.stringify({ data }), { status: 200 });
     }
+    // Kitsu API: AniList 2 -> Kitsu 222 (as if Fribb did not know it); Kitsu 777 -> AniList 3.
+    if (url.includes("kitsu.app/api/edge/mappings") && url.includes("anilist%2Fanime") && url.includes("externalId%5D=3&")) {
+      return new Response(JSON.stringify({ data: [{ relationships: { item: { data: { type: "anime", id: "333" } } } }] }));
+    }
+    if (url.includes("kitsu.app/api/edge/anime/777/mappings")) {
+      return new Response(JSON.stringify({ data: [{ attributes: { externalSite: "anilist/anime", externalId: "3" } }] }));
+    }
+    if (url.includes("kitsu.app")) return new Response(JSON.stringify({ data: [] }));
     if (url.includes("mapping.json")) {
       return new Response(JSON.stringify({ "1": 100, "2": [0, "tt0000002"] }), { status: 200 });
     }
@@ -119,7 +127,7 @@ describe("handleRequest", () => {
     const { res, body } = await get("/catalog/anime/al_top/genre=Podzim%202026.json", deps, { MAPPING_URL: "https://m/mapping.json" });
     expect(res.status).toBe(200);
     expect(res.headers.get("cdn-cache-control")).toContain("max-age=900");
-    expect(body.metas.map((m: { id: string }) => m.id)).toEqual(["alsz:1", "alsz:2", "alsz:3"]);
+    expect(body.metas.map((m: { id: string }) => m.id)).toEqual(["alsz:1", "alsz:2", "kitsu:333"]);
     // Badges from the user's list (default user): 1 completed + Duo, 2 planned, 3 watching.
     const codes = body.metas.map((m: { poster: string }) => m.poster.split("/poster/")[1]?.split("/")[0]);
     expect(codes).toEqual(["cu", "p", "w"]);
@@ -127,7 +135,7 @@ describe("handleRequest", () => {
     expect(body.metas[2].type).toBe("movie");
     expect(body.metas[0].name).toBe("English 1");
     expect(body.metas[1].name).toBe("Romaji 2");
-    const gql = net.calls.find((c) => c.url.includes("anilist") && !c.body!.query.includes("MediaListCollection"))!.body!;
+    const gql = net.calls.find((c) => c.url.includes("graphql.anilist.co") && !c.body!.query.includes("MediaListCollection"))!.body!;
     expect(gql.variables).toMatchObject({ season: "FALL", seasonYear: 2026, sort: ["SCORE_DESC", "POPULARITY_DESC", "ID_DESC"], averageScore_greater: 0, page: 1, perPage: 50 });
   });
 
@@ -137,16 +145,16 @@ describe("handleRequest", () => {
     await get("/catalog/anime/al_popular.json", deps, { MAPPING_URL: "https://m/mapping.json" });
     await get("/catalog/anime/al_popular.json", deps, { MAPPING_URL: "https://m/mapping.json" });
     // One browse request + one collection request; the second call is served from memory.
-    expect(net.calls.filter((c) => c.url.includes("anilist")).length).toBe(2);
+    expect(net.calls.filter((c) => c.url.includes("graphql.anilist.co")).length).toBe(2);
   });
 
   it("serves a user list for a user from the URL with the 15 min cache", async () => {
     const net = fakeFetch();
     const deps = { cache: new MemoryCache(), now: NOW, fetchImpl: net.impl as never, anilist: { fetchImpl: net.impl as never } };
     const { res, body } = await get("/u/SomeUser/catalog/anime/al_list_current/skip=0.json", deps, { MAPPING_URL: "https://m/mapping.json" });
-    expect(body.metas.map((m: { id: string }) => m.id)).toEqual(["alsz:3"]);
+    expect(body.metas.map((m: { id: string }) => m.id)).toEqual(["kitsu:333"]);
     expect(res.headers.get("cdn-cache-control")).toContain("max-age=900");
-    const gql = net.calls.find((c) => c.url.includes("anilist"))!.body!;
+    const gql = net.calls.find((c) => c.url.includes("graphql.anilist.co"))!.body!;
     expect(gql.variables).toMatchObject({ userName: "SomeUser", chunk: 1, perChunk: 500 });
   });
 
@@ -180,6 +188,23 @@ describe("handleRequest", () => {
 
     const unknown = await get("/meta/series/kitsu:999999.json", deps, env);
     expect(unknown.res.status).toBe(404);
+  });
+
+  it("finds Kitsu ids the Fribb mapping lacks (e.g. adult titles) via the Kitsu API", async () => {
+    const net = fakeFetch();
+    const deps = { cache: new MemoryCache(), now: NOW, fetchImpl: net.impl as never, anilist: { fetchImpl: net.impl as never } };
+    const env = { MAPPING_URL: "https://m/mapping.json" };
+    // Anime 3 is a movie without a Fribb mapping: its catalog id comes from Kitsu.
+    const { body: catalog } = await get("/catalog/anime/al_top.json", deps, env);
+    expect(catalog.metas.map((m: { id: string }) => m.id)).toEqual(["alsz:1", "alsz:2", "kitsu:333"]);
+    // A kitsu id Fribb does not know resolves back to AniList via Kitsu.
+    const { res, body } = await get("/meta/movie/kitsu:777.json", deps, env);
+    expect(res.status).toBe(200);
+    expect(body.meta.id).toBe("kitsu:777");
+    expect(body.meta.name).toBe("English 3");
+    // Series 2 has no Fribb kitsu id and Kitsu does not know it either: own episode ids.
+    const series = await get("/meta/series/alsz:2.json", deps, env);
+    expect(series.body.meta.videos[0].id).toBe("alsz:2:1");
   });
 
   it("renders a badged poster and refuses other paths", async () => {

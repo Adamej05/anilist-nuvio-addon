@@ -48,8 +48,10 @@ Proto addon běží jako Node funkce na Vercelu.
 **Proč kompaktní mapování:** plný Fribb soubor má 7,5 MB, kompaktní asi 350 kB, takže se rychleji stáhne
 i zpracuje. Když kompaktní soubor chybí (třeba před prvním během Action), addon nouzově použije plný Fribb.
 
-**Tituly bez mapování** (hlavně úplně nové) se nevynechávají. Detail se otevře, ale epizody mají
-ID `alsz:…`, takže pro ně Torrentio streamy nenajde, dokud Fribb nedoplní Kitsu ID (obnovuje se denně).
+**Tituly bez mapování:** Fribb vynechává dospělé tituly úplně a úplně nové tituly může mít s pár dny
+zpožděním. Pro ně se addon zeptá přímo [Kitsu API](https://kitsu.docs.apiary.io/) (podle AniList a MAL ID,
+výsledek drží 24 h). Teprve když Kitsu titul nezná, mají epizody ID `alsz:…` a Nuvio pro ně zdroje nenabídne.
+Pozor: Torrentio dospělé tituly skoro neindexuje, takže i s Kitsu ID často nic nenajde.
 
 **Proč vlastní detail:** dřív detail dodával AIOMetadata a u některých `kitsu:` ID nic nevrátil,
 takže se po kliknutí nic nezobrazilo. Seriály teď mají vlastní prefix `alsz:`, který nikdo jiný
@@ -174,6 +176,7 @@ src/meta.ts           ID, náhledy, detail s epizodami
 src/metaHandler.ts    obsluha /meta
 src/badges.ts         kódy a kreslení ikonek (SDF, vyhlazené)
 src/png.ts            malý PNG dekodér pro obálky
+src/kitsu.ts          záložní dohledání Kitsu ID přes Kitsu API
 src/mapping.ts        načtení mapování (paměť → GitHub → záloha Fribb)
 src/mappingFormat.ts  formát mapování (sdílí ho i build skript)
 src/cache.ts          cache v paměti (LRU s expirací)
