@@ -70,11 +70,13 @@ Když lokálně ještě neexistuje větev `data`, použije se nouzově plný Fri
 
 ## Nasazení na Cloudflare Workers přes GitHub
 
-1. **Repozitář na GitHubu:** vytvoř `adamej05/anilist-nuvio-addon` a pushni do něj tuhle složku (větev `main`).
+1. **Repozitář na GitHubu:** vytvoř `Adamej05/anilist-nuvio-addon` a pushni do něj tuhle složku (větev `main`).
    Pokud repo pojmenuješ jinak, uprav `MAPPING_URL` ve `wrangler.toml`.
-2. **Mapování:** na GitHubu otevři *Actions → Build ID mapping → Run workflow* a spusť ho jednou ručně.
+   Repo musí být **veřejné**: Worker si mapování stahuje z `raw.githubusercontent.com`, a to u soukromého repa vrátí 404.
+2. **Mapování:** Action *Build ID mapping* se spustí sama při pushi, který změní mapovací skript nebo workflow.
+   Kdykoli jindy ji spustíš ručně přes *Actions → Build ID mapping → Run workflow*.
    Vznikne větev `data` se souborem `mapping.json`. Dál se obnovuje sama každý den ve 4:23 UTC.
-3. **Cloudflare:** *Workers & Pages → Create → Import a repository*, vyber `adamej05/anilist-nuvio-addon`.
+3. **Cloudflare:** *Workers & Pages → Create → Import a repository*, vyber `Adamej05/anilist-nuvio-addon`.
    - Production branch: `main`
    - Build command: nech prázdné. Deploy command: `npx wrangler deploy` (výchozí).
    - V *Settings → Build → Branch control* **vypni „Builds for non-production branches“**, jinak

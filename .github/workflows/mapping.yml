@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: "23 4 * * *" # every day 04:23 UTC
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - scripts/build-mapping.ts
+      - src/mappingFormat.ts
+      - .github/workflows/mapping.yml
 
 permissions:
   contents: write
