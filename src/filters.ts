@@ -16,8 +16,10 @@ export const ALL_YEARS_SUFFIX = "(všechny roky)";
 /**
  * Genres offered after the years. AniList genres use genre_in, the
  * demographics (Shounen, Seinen, ...) are AniList tags and use tag_in.
+ * Everything excludes adult titles except "Hentai" (adult: true), which
+ * shows only adult titles.
  */
-export const GENRES: ReadonlyArray<{ label: string; genre?: string; tag?: string }> = [
+export const GENRES: ReadonlyArray<{ label: string; genre?: string; tag?: string; adult?: boolean }> = [
   { label: "Akce", genre: "Action" },
   { label: "Dobrodružné", genre: "Adventure" },
   { label: "Komedie", genre: "Comedy" },
@@ -36,6 +38,7 @@ export const GENRES: ReadonlyArray<{ label: string; genre?: string; tag?: string
   { label: "Sport", genre: "Sports" },
   { label: "Nadpřirozené", genre: "Supernatural" },
   { label: "Thriller", genre: "Thriller" },
+  { label: "Hentai", genre: "Hentai", adult: true },
   { label: "Shounen", tag: "Shounen" },
   { label: "Shoujo", tag: "Shoujo" },
   { label: "Seinen", tag: "Seinen" },
@@ -182,6 +185,7 @@ export interface MediaVariables {
   seasonYear?: number;
   genre_in?: string[];
   tag_in?: string[];
+  isAdult?: boolean;
   startDate_greater?: number;
   startDate_lesser?: number;
   averageScore_greater?: number;
@@ -207,7 +211,7 @@ export function filterToVariables(filter: Filter): Partial<MediaVariables> {
       return { season: filter.season, seasonYear: filter.year };
     case "genre": {
       const g = GENRES.find((x) => x.label === filter.label);
-      if (g?.genre) return { genre_in: [g.genre] };
+      if (g?.genre) return g.adult ? { genre_in: [g.genre], isAdult: true } : { genre_in: [g.genre] };
       if (g?.tag) return { tag_in: [g.tag] };
       return {};
     }
@@ -220,6 +224,7 @@ export function catalogVariables(
   formats: readonly MediaFormat[] = FORMATS,
 ): MediaVariables {
   const vars: MediaVariables = {
+    isAdult: false,
     // ID_DESC as a tie-breaker keeps paging stable.
     sort: sort === "popular" ? ["POPULARITY_DESC", "ID_DESC"] : ["SCORE_DESC", "POPULARITY_DESC", "ID_DESC"],
     format_in: [...formats],

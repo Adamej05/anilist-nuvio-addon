@@ -4,7 +4,8 @@ Doplněk (addon) ve formátu Stremio addon protocol. Nabízí:
 
 - **Anime: Nejpopulárnější** a **Anime: Nejlépe hodnocené**, oba s jedním filtrem
   „Vše / Zima (všechny roky) / … / Rok 2027 / Zima 2027 / … / Rok 1960 / Akce / … / Shounen / Seinen / …“.
-  Za roky následují žánry (Akce, Romantika, Sport, …) a demografie (Shounen, Shoujo, Seinen, Josei, Pro děti).
+  Za roky následují žánry (Akce, Romantika, Sport, …, Hentai) a demografie (Shounen, Shoujo, Seinen, Josei, Pro děti).
+  Dospělé tituly (`isAdult`) jsou vyloučené všude kromě volby Hentai, která ukazuje jen je.
   Nuvio ukáže jen jeden rozbalovací seznam, takže se vybírá buď období, nebo žánr, kombinovat je nejde.
 - **AniList: Sleduji, V plánu, Dokončeno, Pozastaveno, Zahozeno** a všechny **vlastní seznamy**
   (např. Duo, Solo) zvoleného uživatele AniListu (jen čtení, bez přihlášení), seřazené podle poslední změny,

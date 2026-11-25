@@ -37,12 +37,13 @@ query (
   $page: Int, $perPage: Int, $sort: [MediaSort], $format_in: [MediaFormat],
   $season: MediaSeason, $seasonYear: Int,
   $startDate_greater: FuzzyDateInt, $startDate_lesser: FuzzyDateInt,
-  $averageScore_greater: Int, $genre_in: [String], $tag_in: [String]
+  $averageScore_greater: Int, $genre_in: [String], $tag_in: [String],
+  $isAdult: Boolean = false
 ) {
   Page(page: $page, perPage: $perPage) {
     pageInfo { hasNextPage }
     media(
-      type: ANIME, isAdult: false, sort: $sort, format_in: $format_in,
+      type: ANIME, isAdult: $isAdult, sort: $sort, format_in: $format_in,
       season: $season, seasonYear: $seasonYear,
       startDate_greater: $startDate_greater, startDate_lesser: $startDate_lesser,
       averageScore_greater: $averageScore_greater,

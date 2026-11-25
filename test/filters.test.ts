@@ -169,6 +169,17 @@ describe("filter -> AniList variables", () => {
     expect(filterToVariables({ kind: "genre", label: "Romantika" })).toEqual({ genre_in: ["Romance"] });
     expect(filterToVariables({ kind: "genre", label: "Shounen" })).toEqual({ tag_in: ["Shounen"] });
     expect(filterToVariables({ kind: "genre", label: "Seinen" })).toEqual({ tag_in: ["Seinen"] });
+    expect(catalogVariables({ kind: "genre", label: "Romantika" }, "popular").isAdult).toBe(false);
+  });
+
+  it("only Hentai switches to adult titles", () => {
+    expect(filterToVariables({ kind: "genre", label: "Hentai" })).toEqual({ genre_in: ["Hentai"], isAdult: true });
+    expect(catalogVariables({ kind: "genre", label: "Hentai" }, "top")).toMatchObject({ genre_in: ["Hentai"], isAdult: true });
+    expect(catalogVariables({ kind: "all" }, "popular").isAdult).toBe(false);
+    expect(catalogVariables({ kind: "year", year: 2012 }, "top").isAdult).toBe(false);
+    expect(parseGenreOption("hentai")).toEqual({ kind: "genre", label: "Hentai" });
+    const options = buildGenreOptions(NOV_2026);
+    expect(options.indexOf("Hentai")).toBe(options.indexOf("Thriller") + 1);
     const top = catalogVariables({ kind: "genre", label: "Seinen" }, "top");
     expect(top).toMatchObject({ tag_in: ["Seinen"], averageScore_greater: 0, sort: ["SCORE_DESC", "POPULARITY_DESC", "ID_DESC"] });
   });

@@ -4,7 +4,8 @@ import { loadSlice, parseExtra, resolveCatalog } from "../src/catalog";
 
 describe("GraphQL queries", () => {
   it("browse query excludes adult titles and uses the filter variables", () => {
-    expect(BROWSE_QUERY).toContain("isAdult: false");
+    expect(BROWSE_QUERY).toContain("isAdult: $isAdult");
+    expect(BROWSE_QUERY).toContain("$isAdult: Boolean = false");
     for (const v of ["$sort", "$format_in", "$season", "$seasonYear", "$startDate_greater", "$startDate_lesser", "$averageScore_greater", "$genre_in", "$tag_in"]) {
       expect(BROWSE_QUERY).toContain(v);
     }
