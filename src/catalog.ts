@@ -14,7 +14,7 @@ import { catalogVariables, parseGenreOption, parseSplitFilter, skipToPages, SPLI
 import { CATALOG_TYPE, customListFromCatalogId, LIST_CATALOGS, SEASON_CATALOGS, SPLIT_CATALOG } from "./manifest";
 import { kitsuIdForMedia } from "./kitsu";
 import { lookupIds, type CompactMapping } from "./mappingFormat";
-import { stremioType, toMetaPreview, type MetaPreview } from "./meta";
+import { itemType, toMetaPreview, type MetaPreview } from "./meta";
 
 export interface CatalogContext {
   cache: JsonCache;
@@ -149,7 +149,7 @@ export async function handleCatalog(
   const kitsuIds = new Map<number, number>();
   await Promise.all(
     media
-      .filter((m) => stremioType(m.format) === "movie")
+      .filter((m) => itemType(m) === "movie")
       .filter((m) => {
         const ids = lookupIds(mapping, m.id);
         return !ids.kitsu && !ids.imdb;

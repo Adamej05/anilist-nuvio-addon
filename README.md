@@ -33,6 +33,7 @@ Streamy pro epizody najde **Torrentio** (ID epizod jsou `kitsu:<id>:<epizoda>`).
 | ID seriálů | `alsz:<anilistId>`: vlastní prefix, detail dodá vždy tento addon (bez závislosti na pořadí doplňků) |
 | ID filmů | `kitsu:<id>` (záložně IMDb), protože Nuvio u filmů pouští stream s ID položky |
 | ID epizod | `kitsu:<id>:<epizoda>`, Torrentio je umí; bez Kitsu mapování `alsz:<id>:<epizoda>` (bez streamů) |
+| Dospělé tituly | typ `anime`, epizody `anilist:<id>:<epizoda>`: formát, který umí zdrojový doplněk [Yomi](https://github.com/mralanbourne/Yomi) (streamy deklaruje jen pro typ `anime` a dospělé tituly přes Kitsu nenajde). Torrentio pro ně dotazované není |
 | Mapování AniList → Kitsu/IMDb | [Fribb/anime-lists](https://github.com/Fribb/anime-lists), GitHub Action z něj denně vyrobí kompaktní `mapping.json` (~350 kB) ve větvi `data` |
 | Detail a epizody | vlastní `/meta` z AniListu: počet epizod, data podle rozvrhu vysílání (chybějící dopočítá), názvy a náhledy z Crunchyroll dat AniListu |
 | Ikonky | `/poster/<kódy>/<cesta obálky>` stáhne obálku z AniListu (JPEG i PNG), dokreslí ikonky a vrátí JPEG; CDN ji drží 30 dní |

@@ -9,12 +9,17 @@ import { lookupIds, type CompactMapping } from "./mappingFormat";
  *   detail page always works; its episodes are "kitsu:<id>:<ep>", which Torrentio knows.
  * - movies  -> "kitsu:<id>" (or IMDb), because Nuvio asks for movie streams with the
  *   item id itself. This addon also serves meta for kitsu: ids.
+ * - adult titles (AniList isAdult) -> "alsz:<anilistId>" with type "anime" and episodes
+ *   "anilist:<id>:<ep>". That is what the Yomi stream addon understands (it declares
+ *   streams only for type "anime", and its kitsu: lookup does not know adult titles).
  */
 export const OWN_PREFIX = "alsz:";
 
+export type ItemType = "movie" | "series" | "anime";
+
 export interface MetaPreview {
   id: string;
-  type: "movie" | "series";
+  type: ItemType;
   name: string;
   poster?: string;
   posterShape: "poster";
@@ -30,9 +35,18 @@ export function stremioType(format: string | null): "movie" | "series" {
   return format === "MOVIE" || format === "SPECIAL" ? "movie" : "series";
 }
 
+/** Type of an item: "anime" for adult titles (see above), else movie / series. */
+export function itemType(m: { format: string | null; isAdult?: boolean | null }): ItemType {
+  return m.isAdult ? "anime" : stremioType(m.format);
+}
+
 /** kitsuOverride: a Kitsu id found outside the Fribb mapping (see kitsu.ts). */
-export function itemId(m: Pick<AniListMedia, "id" | "format">, mapping: CompactMapping, kitsuOverride?: number): string {
-  if (stremioType(m.format) === "movie") {
+export function itemId(
+  m: { id: number; format: string | null; isAdult?: boolean | null },
+  mapping: CompactMapping,
+  kitsuOverride?: number,
+): string {
+  if (itemType(m) === "movie") {
     const ids = lookupIds(mapping, m.id);
     const kitsu = ids.kitsu ?? kitsuOverride;
     if (kitsu) return `kitsu:${kitsu}`;
@@ -41,13 +55,15 @@ export function itemId(m: Pick<AniListMedia, "id" | "format">, mapping: CompactM
   return `${OWN_PREFIX}${m.id}`;
 }
 
-/** Video id of one episode: kitsu when mapped (Torrentio), otherwise our own. */
+/** Video id of one episode: anilist for adult titles (Yomi), kitsu when known (Torrentio), else our own. */
 export function episodeVideoId(
   anilistId: number,
   episode: number,
   mapping: CompactMapping,
   kitsuOverride?: number,
+  adult = false,
 ): string {
+  if (adult) return `anilist:${anilistId}:${episode}`;
   const kitsu = lookupIds(mapping, anilistId).kitsu ?? kitsuOverride;
   return kitsu ? `kitsu:${kitsu}:${episode}` : `${OWN_PREFIX}${anilistId}:${episode}`;
 }
@@ -98,7 +114,7 @@ export function toMetaPreview(m: AniListMedia, mapping: CompactMapping, opts: Pr
   const year = m.seasonYear ?? m.startDate?.year ?? undefined;
   const meta: MetaPreview = {
     id: itemId(m, mapping, opts.kitsuId),
-    type: stremioType(m.format),
+    type: itemType(m),
     name: displayTitle(m),
     posterShape: "poster",
   };
@@ -226,7 +242,7 @@ export function toMetaDetail(
   mapping: CompactMapping,
   opts: {
     id: string;
-    type: "movie" | "series";
+    type: ItemType;
     entry?: Pick<ListEntry, "status" | "customLists">;
     /** Kitsu id found outside the Fribb mapping. */
     kitsuId?: number;
@@ -261,7 +277,7 @@ export function toMetaDetail(
     const ep = i + 1;
     const extraInfo = info.get(ep);
     const video: MetaVideo = {
-      id: episodeVideoId(m.id, ep, mapping, opts.kitsuId),
+      id: episodeVideoId(m.id, ep, mapping, opts.kitsuId, Boolean(m.isAdult)),
       title: extraInfo?.title ? `${ep}. ${extraInfo.title}` : `Epizoda ${ep}`,
       season: 1,
       episode: ep,

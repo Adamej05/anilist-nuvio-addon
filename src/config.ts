@@ -66,6 +66,6 @@ export const USER_AGENT = "anilist-nuvio-addon/1.0 (+https://github.com/Adamej05
 /** Full Fribb dataset, used only as a fallback when the compact mapping is unavailable. */
 export const FRIBB_URL = "https://raw.githubusercontent.com/Fribb/anime-lists/master/anime-list-full.json";
 
-export const ADDON_VERSION = "1.3.1";
+export const ADDON_VERSION = "1.4.0";
 export const ADDON_ID = "community.anilist-seasons";
 export const ADDON_NAME = "AniList Sezóny";

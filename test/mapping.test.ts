@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildManifest } from "../src/manifest";
 import { anilistIdForKitsu, convertFribb, lookupIds } from "../src/mappingFormat";
-import { episodeCount, episodeDates, episodeVideoId, itemId, listLine, stripHtml, stremioType, toMetaPreview } from "../src/meta";
+import { episodeCount, episodeDates, episodeVideoId, itemId, itemType, listLine, stripHtml, stremioType, toMetaPreview } from "../src/meta";
 
 const sample = [
   { anilist_id: 290, kitsu_id: 265, imdb_id: ["tt0286390"] },
@@ -36,6 +36,14 @@ describe("mapping", () => {
   it("episodes use kitsu ids for Torrentio when mapped", () => {
     expect(episodeVideoId(290, 3, m)).toBe("kitsu:265:3");
     expect(episodeVideoId(500, 1, m)).toBe("alsz:500:1");
+  });
+
+  it("adult titles are type anime with anilist episode ids (Yomi)", () => {
+    expect(itemType({ format: "OVA", isAdult: true })).toBe("anime");
+    expect(itemType({ format: "MOVIE", isAdult: true })).toBe("anime");
+    expect(itemType({ format: "MOVIE", isAdult: false })).toBe("movie");
+    expect(itemId({ id: 300, format: "MOVIE", isAdult: true }, m)).toBe("alsz:300");
+    expect(episodeVideoId(290, 2, m, undefined, true)).toBe("anilist:290:2");
   });
 });
 

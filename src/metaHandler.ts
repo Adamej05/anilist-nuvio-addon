@@ -4,7 +4,7 @@ import { entryIndex, getCollection } from "./catalog";
 import { TTL } from "./config";
 import { externalIdsForKitsu, kitsuIdForMedia } from "./kitsu";
 import { anilistIdForKitsu, lookupIds, type CompactMapping } from "./mappingFormat";
-import { OWN_PREFIX, stremioType, toMetaDetail, type MetaDetailResponse } from "./meta";
+import { itemType, OWN_PREFIX, stremioType, toMetaDetail, type MetaDetailResponse } from "./meta";
 
 export interface MetaContext {
   cache: JsonCache;
@@ -54,7 +54,7 @@ export async function handleMeta(
 
   // Episodes need a Kitsu id for Torrentio; Fribb first, then the Kitsu API.
   let kitsuId = lookupIds(mapping, media.id).kitsu;
-  if (!kitsuId) {
+  if (!kitsuId && !media.isAdult) {
     kitsuId = requestedKitsu ? Number(requestedKitsu[1]) : await kitsuIdForMedia(media.id, media.idMal, kitsuDeps);
   }
 
@@ -67,8 +67,13 @@ export async function handleMeta(
     }
   }
 
-  // Keep the type Nuvio asked for when it is a real Stremio type, so streams match.
-  const metaType = type === "movie" || type === "series" ? type : stremioType(media.format);
+  // Adult titles are always "anime" (Yomi). Otherwise keep the type Nuvio asked for
+  // when it is a real Stremio type, so streams match.
+  const metaType = media.isAdult
+    ? itemType(media)
+    : type === "movie" || type === "series"
+      ? type
+      : stremioType(media.format);
   return {
     meta: toMetaDetail(media, mapping, { id, type: metaType, entry, kitsuId }),
     cacheSeconds: ctx.username ? TTL.userList : TTL.mediaDetail,
