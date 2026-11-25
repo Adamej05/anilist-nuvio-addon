@@ -103,7 +103,7 @@ nejstarší rok (`MIN_YEAR = 1960`), formáty (`FORMATS`), doby cache, jazyk ná
 
 ## Manifest URL a přidání do Nuvia
 
-Po nasazení Vercel ukáže adresu ve tvaru `https://anilist-nuvio-addon.vercel.app` (nebo podobnou, podle volného názvu).
+Produkční adresa: **`https://anilist-nuvio-addon.vercel.app/manifest.json`**
 
 - Výchozí uživatel: `https://<adresa>/manifest.json`
 - Jiný účet: `https://<adresa>/u/<JmenoNaAniListu>/manifest.json`
