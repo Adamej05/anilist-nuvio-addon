@@ -37,7 +37,7 @@ query (
   $page: Int, $perPage: Int, $sort: [MediaSort], $format_in: [MediaFormat],
   $season: MediaSeason, $seasonYear: Int,
   $startDate_greater: FuzzyDateInt, $startDate_lesser: FuzzyDateInt,
-  $averageScore_greater: Int
+  $averageScore_greater: Int, $genre_in: [String], $tag_in: [String]
 ) {
   Page(page: $page, perPage: $perPage) {
     pageInfo { hasNextPage }
@@ -45,7 +45,8 @@ query (
       type: ANIME, isAdult: false, sort: $sort, format_in: $format_in,
       season: $season, seasonYear: $seasonYear,
       startDate_greater: $startDate_greater, startDate_lesser: $startDate_lesser,
-      averageScore_greater: $averageScore_greater
+      averageScore_greater: $averageScore_greater,
+      genre_in: $genre_in, tag_in: $tag_in
     ) { ${MEDIA_FIELDS} }
   }
 }`;

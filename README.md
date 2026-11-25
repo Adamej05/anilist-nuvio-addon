@@ -3,7 +3,9 @@
 Doplněk (addon) ve formátu Stremio addon protocol. Nabízí:
 
 - **Anime: Nejpopulárnější** a **Anime: Nejlépe hodnocené**, oba s jedním filtrem
-  „Vše / Zima (všechny roky) / … / Rok 2027 / Zima 2027 / … / Rok 1960“,
+  „Vše / Zima (všechny roky) / … / Rok 2027 / Zima 2027 / … / Rok 1960 / Akce / … / Shounen / Seinen / …“.
+  Za roky následují žánry (Akce, Romantika, Sport, …) a demografie (Shounen, Shoujo, Seinen, Josei, Pro děti).
+  Nuvio ukáže jen jeden rozbalovací seznam, takže se vybírá buď období, nebo žánr, kombinovat je nejde.
 - **AniList: Sleduji, V plánu, Dokončeno, Pozastaveno, Zahozeno** a všechny **vlastní seznamy**
   (např. Duo, Solo) zvoleného uživatele AniListu (jen čtení, bez přihlášení), seřazené podle poslední změny,
 - **ikonky na plakátech** ve všech katalozích, takže už na Home vidíš, co máš v seznamu:
@@ -117,6 +119,9 @@ Výchozí hodnoty jsou v `src/config.ts`. Přepsat je můžeš proměnnými pros
 | `ANILIST_USER` | `Achnatos` | uživatel pro seznamy; `-` = bez seznamů |
 | `ENABLE_SPLIT_FILTERS` | `false` | `true` přidá testovací katalog se dvěma filtry |
 | `MAPPING_URL` | raw URL větve `data` | kompaktní mapování |
+
+Seznam žánrů je v `GENRES` v `src/filters.ts`: AniList žánry jdou přes `genre_in`,
+demografie jsou na AniListu tagy a jdou přes `tag_in`.
 
 Další konstanty jsou v `src/config.ts`: počet let se sezónami (`SEASON_YEARS_COUNT = 10`),
 nejstarší rok (`MIN_YEAR = 1960`), formáty (`FORMATS`), doby cache, jazyk názvů.

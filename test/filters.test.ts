@@ -5,6 +5,7 @@ import {
   catalogVariables,
   filterToLabel,
   filterToVariables,
+  GENRES,
   parseGenreOption,
   parseSplitFilter,
   skipToPages,
@@ -55,11 +56,16 @@ describe("buildGenreOptions", () => {
     ]);
   });
 
-  it("ends with Rok 1960 and has the expected count", () => {
-    expect(options.at(-1)).toBe("Rok 1960");
+  it("puts the genres after Rok 1960 and has the expected count", () => {
+    const iLastYear = options.indexOf("Rok 1960");
+    expect(options.slice(iLastYear + 1)).toEqual(GENRES.map((g) => g.label));
+    expect(options).toContain("Seinen");
+    expect(options).toContain("Sport");
+    expect(options).toContain("Romantika");
+    expect(options.at(-1)).toBe("Pro děti");
     expect(options).not.toContain("Rok 1959");
-    // 1 + 4 + 68 years (2027..1960) + 10 years * 4 seasons
-    expect(options).toHaveLength(1 + 4 + 68 + 40);
+    // 1 + 4 + 68 years (2027..1960) + 10 years * 4 seasons + genres
+    expect(options).toHaveLength(1 + 4 + 68 + 40 + GENRES.length);
     expect(new Set(options).size).toBe(options.length);
   });
 
@@ -80,7 +86,7 @@ describe("buildGenreOptions", () => {
     const opts = buildGenreOptions(NOV_2026, { seasonYearsCount: 2 });
     expect(opts).toContain("Podzim 2026");
     expect(opts).not.toContain("Zima 2025");
-    expect(opts).toHaveLength(1 + 4 + 68 + 8);
+    expect(opts).toHaveLength(1 + 4 + 68 + 8 + GENRES.length);
   });
 
   it("every option parses back to itself", () => {
@@ -109,6 +115,12 @@ describe("parseGenreOption", () => {
     const nfd = "Léto  2024".normalize("NFD");
     expect(nfd).not.toBe("Léto  2024");
     expect(parseGenreOption(nfd)).toEqual({ kind: "seasonYear", season: "SUMMER", year: 2024 });
+  });
+
+  it("parses genres and demographics, case-insensitive", () => {
+    expect(parseGenreOption("Romantika")).toEqual({ kind: "genre", label: "Romantika" });
+    expect(parseGenreOption("seinen")).toEqual({ kind: "genre", label: "Seinen" });
+    expect(parseGenreOption("Dobrodružné".normalize("NFD"))).toEqual({ kind: "genre", label: "Dobrodružné" });
   });
 
   it("rejects unknown values", () => {
@@ -150,6 +162,15 @@ describe("filter -> AniList variables", () => {
     expect(inYear(20271231)).toBe(true);
     expect(inYear(20261231)).toBe(false);
     expect(inYear(20280000)).toBe(false);
+  });
+
+  it("genres use genre_in, demographics use tag_in", () => {
+    expect(filterToVariables({ kind: "genre", label: "Sport" })).toEqual({ genre_in: ["Sports"] });
+    expect(filterToVariables({ kind: "genre", label: "Romantika" })).toEqual({ genre_in: ["Romance"] });
+    expect(filterToVariables({ kind: "genre", label: "Shounen" })).toEqual({ tag_in: ["Shounen"] });
+    expect(filterToVariables({ kind: "genre", label: "Seinen" })).toEqual({ tag_in: ["Seinen"] });
+    const top = catalogVariables({ kind: "genre", label: "Seinen" }, "top");
+    expect(top).toMatchObject({ tag_in: ["Seinen"], averageScore_greater: 0, sort: ["SCORE_DESC", "POPULARITY_DESC", "ID_DESC"] });
   });
 
   it("a season in all years sets only the season", () => {

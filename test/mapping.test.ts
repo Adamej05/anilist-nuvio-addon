@@ -134,6 +134,7 @@ describe("manifest", () => {
     expect(genre.isRequired).toBe(false);
     expect(genre.options![0]).toBe("Vše");
     expect(genre.options![5]).toBe("Rok 2027");
+    expect(genre.options!.at(-1)).toBe("Pro děti");
     expect(m.catalogs[0]!.extra.map((e) => e.name)).toEqual(["genre", "skip"]);
   });
 

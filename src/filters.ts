@@ -13,11 +13,42 @@ export const LABEL_ALL = "Vše";
 export const LABEL_YEAR = "Rok";
 export const ALL_YEARS_SUFFIX = "(všechny roky)";
 
+/**
+ * Genres offered after the years. AniList genres use genre_in, the
+ * demographics (Shounen, Seinen, ...) are AniList tags and use tag_in.
+ */
+export const GENRES: ReadonlyArray<{ label: string; genre?: string; tag?: string }> = [
+  { label: "Akce", genre: "Action" },
+  { label: "Dobrodružné", genre: "Adventure" },
+  { label: "Komedie", genre: "Comedy" },
+  { label: "Drama", genre: "Drama" },
+  { label: "Ecchi", genre: "Ecchi" },
+  { label: "Fantasy", genre: "Fantasy" },
+  { label: "Horor", genre: "Horror" },
+  { label: "Mahou shoujo", genre: "Mahou Shoujo" },
+  { label: "Mecha", genre: "Mecha" },
+  { label: "Hudba", genre: "Music" },
+  { label: "Mysteriózní", genre: "Mystery" },
+  { label: "Psychologické", genre: "Psychological" },
+  { label: "Romantika", genre: "Romance" },
+  { label: "Sci-fi", genre: "Sci-Fi" },
+  { label: "Slice of life", genre: "Slice of Life" },
+  { label: "Sport", genre: "Sports" },
+  { label: "Nadpřirozené", genre: "Supernatural" },
+  { label: "Thriller", genre: "Thriller" },
+  { label: "Shounen", tag: "Shounen" },
+  { label: "Shoujo", tag: "Shoujo" },
+  { label: "Seinen", tag: "Seinen" },
+  { label: "Josei", tag: "Josei" },
+  { label: "Pro děti", tag: "Kids" },
+];
+
 export type Filter =
   | { kind: "all" }
   | { kind: "year"; year: number }
   | { kind: "season"; season: Season }
-  | { kind: "seasonYear"; season: Season; year: number };
+  | { kind: "seasonYear"; season: Season; year: number }
+  | { kind: "genre"; label: string };
 
 export interface OptionsConfig {
   /** Number of newest years that get season + year options. */
@@ -40,7 +71,9 @@ export function yearRange(now: Date, minYear = MIN_YEAR): number[] {
 /**
  * Options of the single "genre" dropdown, in this order:
  * Vše, the four "all years" seasons, then every year from the newest,
- * each year first as "Rok XXXX" and, for the newest N years, its four seasons.
+ * each year first as "Rok XXXX" and, for the newest N years, its four seasons,
+ * and at the end the genres (Nuvio shows one dropdown, so a period and a genre
+ * cannot be combined).
  */
 export function buildGenreOptions(now: Date, cfg: OptionsConfig = {}): string[] {
   const n = cfg.seasonYearsCount ?? SEASON_YEARS_COUNT;
@@ -52,6 +85,7 @@ export function buildGenreOptions(now: Date, cfg: OptionsConfig = {}): string[] 
       for (const s of SEASONS) options.push(`${s.label} ${year}`);
     }
   }
+  for (const g of GENRES) options.push(g.label);
   return options;
 }
 
@@ -65,6 +99,8 @@ export function filterToLabel(filter: Filter): string {
       return `${seasonLabel(filter.season)} ${ALL_YEARS_SUFFIX}`;
     case "seasonYear":
       return `${seasonLabel(filter.season)} ${filter.year}`;
+    case "genre":
+      return filter.label;
   }
 }
 
@@ -90,6 +126,9 @@ export function parseGenreOption(value: string | undefined): Filter | null {
   if (value === undefined) return { kind: "all" };
   const v = value.normalize("NFC").trim().replace(/\s+/g, " ");
   if (v === "" || v === LABEL_ALL) return { kind: "all" };
+
+  const genre = GENRES.find((g) => g.label.toLocaleLowerCase("cs") === v.toLocaleLowerCase("cs"));
+  if (genre) return { kind: "genre", label: genre.label };
 
   const yearMatch = new RegExp(`^${LABEL_YEAR} (\\d{4})$`).exec(v);
   if (yearMatch) return { kind: "year", year: Number(yearMatch[1]) };
@@ -141,6 +180,8 @@ export interface MediaVariables {
   format_in: MediaFormat[];
   season?: Season;
   seasonYear?: number;
+  genre_in?: string[];
+  tag_in?: string[];
   startDate_greater?: number;
   startDate_lesser?: number;
   averageScore_greater?: number;
@@ -164,6 +205,12 @@ export function filterToVariables(filter: Filter): Partial<MediaVariables> {
       return { season: filter.season };
     case "seasonYear":
       return { season: filter.season, seasonYear: filter.year };
+    case "genre": {
+      const g = GENRES.find((x) => x.label === filter.label);
+      if (g?.genre) return { genre_in: [g.genre] };
+      if (g?.tag) return { tag_in: [g.tag] };
+      return {};
+    }
   }
 }
 
