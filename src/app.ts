@@ -1,10 +1,12 @@
 import type { RequestDeps } from "./anilist";
 import type { JsonCache } from "./cache";
-import { handleCatalog, parseExtra } from "./catalog";
+import { coverUrlFromPath, BADGE_CODES_RE, renderBadgedPoster } from "./badges";
+import { getCollection, handleCatalog, parseExtra } from "./catalog";
 import { DEFAULT_ANILIST_USER, DEFAULT_ENABLE_SPLIT_FILTERS, DEFAULT_MAPPING_URL, TTL } from "./config";
 import { configurePage } from "./configure";
 import { buildManifest } from "./manifest";
 import { getMapping } from "./mapping";
+import { handleMeta } from "./metaHandler";
 
 /** Platform-independent request handler (Web Request -> Response). */
 
@@ -101,8 +103,34 @@ export async function handleRequest(request: Request, env: AppEnv, deps: AppDeps
     }
 
     if (segments.length === 1 && segments[0] === "manifest.json") {
-      // Built on every request, so a new year shows up without a deploy.
-      return json(buildManifest({ now: now(), username, usernameFromUrl, splitEnabled }), TTL.manifest);
+      // Built on every request, so a new year (and a new custom list) shows up without a deploy.
+      let customLists: string[] = [];
+      if (username) {
+        try {
+          customLists = (await getCollection(deps.cache, username, deps.anilist)).customListNames;
+        } catch (err) {
+          console.warn("custom lists unavailable for manifest", err);
+        }
+      }
+      return json(buildManifest({ now: now(), username, usernameFromUrl, splitEnabled, customLists }), TTL.manifest);
+    }
+
+    if (segments[0] === "meta" && segments.length === 3 && segments[2]!.endsWith(".json")) {
+      const type = decodeSegment(segments[1]!);
+      const id = decodeSegment(segments[2]!.slice(0, -5));
+      const result = await handleMeta(type, id, {
+        cache: deps.cache,
+        username,
+        getMapping: () => getMapping(mappingUrl, deps.fetchImpl),
+        deps: deps.anilist,
+      });
+      // 404 lets Nuvio try the next metadata addon for ids we do not know.
+      if (!result.meta) return json({ meta: null }, 600, 404);
+      return json({ meta: result.meta }, result.cacheSeconds);
+    }
+
+    if (segments[0] === "poster" && segments.length >= 3) {
+      return await posterResponse(segments[1]!, segments.slice(2).join("/"), deps.fetchImpl ?? fetch);
     }
 
     if (segments[0] === "catalog" && (segments.length === 3 || segments.length === 4)) {
@@ -114,6 +142,7 @@ export async function handleRequest(request: Request, env: AppEnv, deps: AppDeps
 
       const result = await handleCatalog(type, id, extra, {
         cache: deps.cache,
+        origin: url.origin,
         username,
         splitEnabled,
         getMapping: () => getMapping(mappingUrl, deps.fetchImpl),
@@ -130,4 +159,27 @@ export async function handleRequest(request: Request, env: AppEnv, deps: AppDeps
     if (segments[0] === "catalog") return json({ metas: [] }, 60);
     return json({ error: "internal error" }, 0, 500);
   }
+}
+
+/** /poster/<codes>/<AniList cover path>: the AniList cover with status badges drawn in. */
+async function posterResponse(codes: string, coverPath: string, fetchImpl: typeof fetch): Promise<Response> {
+  const source = coverUrlFromPath(coverPath);
+  if (!BADGE_CODES_RE.test(codes) || !source) return json({ error: "not found" }, 0, 404);
+  const res = await fetchImpl(source);
+  if (!res.ok) return new Response(null, { status: 302, headers: { ...CORS_HEADERS, Location: source } });
+  let body: Buffer;
+  try {
+    body = renderBadgedPoster(new Uint8Array(await res.arrayBuffer()), codes);
+  } catch (err) {
+    console.warn("poster render failed", source, err);
+    return new Response(null, { status: 302, headers: { ...CORS_HEADERS, Location: source } });
+  }
+  return new Response(new Uint8Array(body), {
+    headers: {
+      ...CORS_HEADERS,
+      "Content-Type": "image/jpeg",
+      "Cache-Control": `public, max-age=${TTL.poster}, immutable`,
+      "CDN-Cache-Control": `public, max-age=${TTL.poster}, immutable`,
+    },
+  });
 }

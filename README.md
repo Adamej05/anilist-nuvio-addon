@@ -4,22 +4,38 @@ Doplněk (addon) ve formátu Stremio addon protocol. Nabízí:
 
 - **Anime: Nejpopulárnější** a **Anime: Nejlépe hodnocené**, oba s jedním filtrem
   „Vše / Zima (všechny roky) / … / Rok 2027 / Zima 2027 / … / Rok 1960“,
-- **AniList: Sleduji, V plánu, Dokončeno, Pozastaveno, Zahozeno**, tedy seznamy
-  zvoleného uživatele AniListu (jen čtení, bez přihlášení), seřazené podle poslední změny.
+- **AniList: Sleduji, V plánu, Dokončeno, Pozastaveno, Zahozeno** a všechny **vlastní seznamy**
+  (např. Duo, Solo) zvoleného uživatele AniListu (jen čtení, bez přihlášení), seřazené podle poslední změny,
+- **ikonky na plakátech** ve všech katalozích, takže už na Home vidíš, co máš v seznamu:
+
+  | Ikonka | Význam |
+  |---|---|
+  | zelená fajfka | Dokončeno |
+  | oranžové hodiny | V plánu |
+  | modré ▶ | Sleduji (i opakovaně) |
+  | šedá pauza | Pozastaveno |
+  | červený křížek | Zahozeno |
+  | růžové dvě siluety | vlastní seznam Duo |
+
+- **vlastní detail s epizodami**: popis, žánry, hodnocení, trailer, epizody s daty a názvy
+  a na prvním řádku popisu, ve kterých tvých seznamech titul je.
 
 Běží zdarma na Vercelu (Hobby), data bere z veřejného AniList GraphQL API.
-Detail titulu s epizodami dodá **AIOMetadata**, streamy dodá **Torrentio**.
+Streamy pro epizody najde **Torrentio** (ID epizod jsou `kitsu:<id>:<epizoda>`).
 
 ## Jak to funguje
 
 | Část | Řešení |
 |---|---|
-| ID položek | `kitsu:<id>` (Torrentio i AIOMetadata), záložně `tt…` (IMDb), jinak `anilist:<id>` |
+| ID seriálů | `alsz:<anilistId>`: vlastní prefix, detail dodá vždy tento addon (bez závislosti na pořadí doplňků) |
+| ID filmů | `kitsu:<id>` (záložně IMDb), protože Nuvio u filmů pouští stream s ID položky |
+| ID epizod | `kitsu:<id>:<epizoda>`, Torrentio je umí; bez Kitsu mapování `alsz:<id>:<epizoda>` (bez streamů) |
 | Mapování AniList → Kitsu/IMDb | [Fribb/anime-lists](https://github.com/Fribb/anime-lists), GitHub Action z něj denně vyrobí kompaktní `mapping.json` (~350 kB) ve větvi `data` |
-| Detail a epizody | náš addon meta neposkytuje, Nuvio se proto zeptá AIOMetadata (podporuje `kitsu:`, `tt`, `anilist:`) |
-| Streamy | AIOMetadata vytvoří ID epizod `kitsu:<id>:<epizoda>` (nebo `tt…:S:E`) a Torrentio je umí |
+| Detail a epizody | vlastní `/meta` z AniListu: počet epizod, data podle rozvrhu vysílání (chybějící dopočítá), názvy a náhledy z Crunchyroll dat AniListu |
+| Ikonky | `/poster/<kódy>/<cesta obálky>` stáhne obálku z AniListu (JPEG i PNG), dokreslí ikonky a vrátí JPEG; CDN ji drží 30 dní |
+| Tvoje seznamy | celá kolekce uživatele jedním dotazem (`MediaListCollection`), v paměti 15 min; z ní seznamy, vlastní seznamy i ikonky |
 | Typ | katalog `anime`; položky `movie` (MOVIE, SPECIAL) nebo `series` (ostatní), stejně jako u AIOMetadata |
-| Cache | Vercel CDN podle hlavičky `CDN-Cache-Control` (sezónní katalogy 6 h, seznamy 15 min, manifest 1 h) a navíc v paměti funkce (stránky z AniListu, mapování 24 h) |
+| Cache | Vercel CDN podle hlavičky `CDN-Cache-Control` (katalogy s ikonkami 15 min, manifest 1 h, plakáty 30 dní) a navíc v paměti funkce (stránky z AniListu 6 h, detail 6 h, kolekce 15 min, mapování 24 h) |
 | Rate limit | AniList teď povoluje 30 požadavků za minutu (hlavička `X-RateLimit-Limit`). Při 429 addon počká podle `Retry-After` (max. 15 s) a zkusí to až 2× znovu |
 
 **Proč ne Cloudflare Workers:** AniList blokuje všechny požadavky z Cloudflare Workers
@@ -29,8 +45,12 @@ Proto addon běží jako Node funkce na Vercelu.
 **Proč kompaktní mapování:** plný Fribb soubor má 7,5 MB, kompaktní asi 350 kB, takže se rychleji stáhne
 i zpracuje. Když kompaktní soubor chybí (třeba před prvním během Action), addon nouzově použije plný Fribb.
 
-**Tituly bez mapování** (hlavně úplně nové) se nevynechávají. Dostanou ID `anilist:<id>`
-a AIOMetadata je zkusí přeložit vlastním mapováním. Když to nezvládne, detail se neotevře.
+**Tituly bez mapování** (hlavně úplně nové) se nevynechávají. Detail se otevře, ale epizody mají
+ID `alsz:…`, takže pro ně Torrentio streamy nenajde, dokud Fribb nedoplní Kitsu ID (obnovuje se denně).
+
+**Proč vlastní detail:** dřív detail dodával AIOMetadata a u některých `kitsu:` ID nic nevrátil,
+takže se po kliknutí nic nezobrazilo. Seriály teď mají vlastní prefix `alsz:`, který nikdo jiný
+neobsluhuje, a filmy s `kitsu:` addon obslouží taky (Nuvio zkouší doplňky v pořadí a při chybě jde na další).
 
 ### Co Nuvio umí z filtrů (extra)
 
@@ -110,7 +130,9 @@ Produkční adresa: **`https://anilist-nuvio-addon.vercel.app/manifest.json`**
 - Nebo otevři `…/configure`, napiš jméno a zkopíruj URL.
 
 V Nuviu: **Nastavení → Doplňky (Addons) → Přidat doplněk**, vlož manifest URL a potvrď.
-Pořadí doplňků: AIOMetadata by měl zůstat nad doplňky, které umí meta pro `kitsu:`, aby detail dodával on.
+Po aktualizaci addonu (nová verze manifestu) ho v Nuviu obnov nebo odeber a přidej znovu,
+jinak si Nuvio drží starý manifest (bez detailu a vlastních seznamů).
+Pokud se u filmů zobrazuje detail z jiného doplňku, posuň tento addon v pořadí nad AIOMetadata.
 Katalogy najdeš na Home a v Discover (typ „anime“). Filtr je rozbalovací seznam „žánr“.
 
 ## Endpointy
@@ -120,11 +142,17 @@ Katalogy najdeš na Home a v Discover (typ „anime“). Filtr je rozbalovací s
 | `/manifest.json` | manifest, volby filtru se generují při každém požadavku (rok+1 až 1960) |
 | `/catalog/anime/{id}.json` | katalog bez filtru |
 | `/catalog/anime/{id}/genre=…&skip=….json` | katalog s filtrem a stránkováním |
+| `/meta/{series|movie}/{alsz:…|kitsu:…}.json` | detail s epizodami |
+| `/poster/{kódy}/{cesta obálky}` | plakát s ikonkami |
 | `/u/{uživatel}/…` | totéž pro jiného uživatele AniListu |
 | `/configure` | konfigurační stránka |
 
 ID katalogů: `al_popular`, `al_top`, `al_list_current`, `al_list_planning`, `al_list_completed`,
-`al_list_paused`, `al_list_dropped`, volitelně `al_popular_split`.
+`al_list_paused`, `al_list_dropped`, `al_custom_<název v base64url>` pro vlastní seznamy,
+volitelně `al_popular_split`. Vlastní seznamy se načítají z AniListu při každém požadavku na manifest.
+
+Které vlastní seznamy dostanou ikonku dvou siluet, určuje `DUO_LIST_NAMES` v `src/config.ts`
+(výchozí `["duo"]`); `BOOKMARK_LIST_NAMES` přidá fialovou záložku dalším seznamům (výchozí žádné).
 
 ## Struktura
 
@@ -136,7 +164,10 @@ src/manifest.ts       manifest a definice katalogů
 src/filters.ts        volby filtru, převod na AniList proměnné, skip → stránka
 src/anilist.ts        GraphQL dotazy, retry při 429
 src/catalog.ts        obsluha katalogů
-src/meta.ts           převod AniList média na Stremio položku
+src/meta.ts           ID, náhledy, detail s epizodami
+src/metaHandler.ts    obsluha /meta
+src/badges.ts         kódy a kreslení ikonek (SDF, vyhlazené)
+src/png.ts            malý PNG dekodér pro obálky
 src/mapping.ts        načtení mapování (paměť → GitHub → záloha Fribb)
 src/mappingFormat.ts  formát mapování (sdílí ho i build skript)
 src/cache.ts          cache v paměti (LRU s expirací)

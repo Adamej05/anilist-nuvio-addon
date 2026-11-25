@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { anilistRequest, BROWSE_QUERY, fetchUserListPage, retryDelaySeconds, USER_LIST_QUERY } from "../src/anilist";
+import { anilistRequest, BROWSE_QUERY, COLLECTION_QUERY, fetchUserCollection, retryDelaySeconds } from "../src/anilist";
 import { loadSlice, parseExtra, resolveCatalog } from "../src/catalog";
 
 describe("GraphQL queries", () => {
@@ -12,9 +12,10 @@ describe("GraphQL queries", () => {
     expect(BROWSE_QUERY).toContain("bannerImage");
   });
 
-  it("user list query sorts by last update", () => {
-    expect(USER_LIST_QUERY).toContain("UPDATED_TIME_DESC");
-    expect(USER_LIST_QUERY).toContain("status_in: $status_in");
+  it("collection query loads all lists with custom list membership", () => {
+    expect(COLLECTION_QUERY).toContain("MediaListCollection");
+    expect(COLLECTION_QUERY).toContain("customLists(asArray: true)");
+    expect(COLLECTION_QUERY).toContain("hasNextChunk");
   });
 });
 
@@ -111,12 +112,57 @@ describe("rate limit handling", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(3);
   });
 
-  it("returns an empty list for an unknown user", async () => {
+  it("returns an empty collection for an unknown user", async () => {
     const fetchImpl = vi.fn(
       async () =>
         new Response(JSON.stringify({ data: null, errors: [{ message: "Not Found.", status: 404 }] }), { status: 404 }),
     );
-    const page = await fetchUserListPage("nobody_here", ["CURRENT"], 1, 50, { fetchImpl: fetchImpl as never });
-    expect(page).toEqual({ hasNextPage: false, media: [] });
+    expect(await fetchUserCollection("nobody_here", { fetchImpl: fetchImpl as never })).toEqual({
+      customListNames: [],
+      entries: [],
+    });
+  });
+
+  it("merges chunks, de-duplicates entries and keeps custom lists", async () => {
+    const m = (id: number) => ({ id });
+    const chunks = [
+      {
+        hasNextChunk: true,
+        user: { mediaListOptions: { animeList: { customLists: ["Solo", "Duo"] } } },
+        lists: [
+          {
+            isCustomList: false,
+            entries: [
+              {
+                status: "COMPLETED",
+                updatedAt: 10,
+                customLists: [
+                  { name: "Duo", enabled: true },
+                  { name: "Solo", enabled: false },
+                ],
+                media: m(1),
+              },
+            ],
+          },
+          {
+            isCustomList: true,
+            entries: [{ status: "COMPLETED", updatedAt: 10, customLists: [{ name: "Duo", enabled: true }], media: m(1) }],
+          },
+        ],
+      },
+      {
+        hasNextChunk: false,
+        user: null,
+        lists: [{ isCustomList: false, entries: [{ status: "PLANNING", updatedAt: 20, customLists: null, media: m(2) }] }],
+      },
+    ];
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ data: { MediaListCollection: chunks.shift() } })));
+    const col = await fetchUserCollection("x", { fetchImpl: fetchImpl as never });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(col.customListNames).toEqual(["Solo", "Duo"]);
+    expect(col.entries.map((e) => [e.media.id, e.status, e.customLists])).toEqual([
+      [2, "PLANNING", []],
+      [1, "COMPLETED", ["Duo"]],
+    ]);
   });
 });
