@@ -1,0 +1,15 @@
+name = "anilist-nuvio-addon"
+main = "src/index.ts"
+compatibility_date = "2025-11-01"
+workers_dev = true
+
+[observability]
+enabled = true
+
+[vars]
+# Default AniList user for the list catalogs. Override per URL: /u/<user>/manifest.json
+ANILIST_USER = "Achnatos"
+# "true" adds a test catalog with two separate filters (rok + sezona).
+ENABLE_SPLIT_FILTERS = "false"
+# Compact mapping published by .github/workflows/mapping.yml to the "data" branch.
+MAPPING_URL = "https://raw.githubusercontent.com/adamej05/anilist-nuvio-addon/data/mapping.json"
